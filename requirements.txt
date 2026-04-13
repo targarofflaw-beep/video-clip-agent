@@ -1,2 +1,4 @@
 flask
-imageio[ffmpeg]
+requests
+google-auth
+google-api-python-client
