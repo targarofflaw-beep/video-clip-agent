@@ -23,12 +23,16 @@ def get_drive_service():
 def home():
     return 'Video Clip Agent is running!'
 
+@app.route('/cut', methods=['POST'])
+def cut_video():
 @app.route('/process', methods=['POST'])
 def process_clip():
     data = request.json
+    input_file = data.get('input_file')
     file_id = data.get('file_id')
     start_time = data.get('start_time')
     duration = data.get('duration', 30)
+    output_file = data.get('output_file', 'output.mp4')
     emotion_text = data.get('emotion_text', '')
     output_name = data.get('output_name', 'clip.mp4')
     folder_id = data.get('folder_id', '')
@@ -37,7 +41,7 @@ def process_clip():
     service = get_drive_service()
     request_drive = service.files().get_media(fileId=file_id)
     input_path = '/tmp/input.mp4'
-    
+
     with open(input_path, 'wb') as f:
         downloader = MediaIoBaseDownload(f, request_drive)
         done = False
@@ -54,17 +58,26 @@ def process_clip():
 
     # FFmpeg команда
     command = [
+        'ffmpeg', '-i', input_file,
+        '-ss', start_time,
         'ffmpeg', '-i', input_path,
         '-ss', str(start_time),
         '-t', str(duration),
+        '-vf', 'scale=1080:1920,hflip',
         '-vf', f'scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,hflip{emotion_filter}',
         '-c:v', 'libx264',
         '-c:a', 'aac',
+        output_file
         '-y',
         output_path
     ]
+    
 
     result = subprocess.run(command, capture_output=True, text=True)
+    
+    if result.returncode == 0:
+        return jsonify({'status': 'success', 'file': output_file})
+    else:
 
     if result.returncode != 0:
         return jsonify({'status': 'error', 'message': result.stderr})
