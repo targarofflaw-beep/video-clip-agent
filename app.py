@@ -115,7 +115,60 @@ def process_clip():
         'file_id': uploaded.get('id'),
         'link': uploaded.get('webViewLink')
     })
-
+@app.route('/check', methods=['POST'])
+def check_availability():
+    data = request.json
+    query = data.get('query')
+    folder_id = data.get('folder_id', '')
+    
+    report = {}
+    
+    # 1. Проверяем сервер
+    report['server'] = '✅ Сервер работает'
+    
+    # 2. Ищем фильм
+    search = subprocess.run([
+        'yt-dlp',
+        f'ytsearch3:{query} фильм',
+        '--get-title',
+        '--get-id',
+        '--no-playlist',
+        '--flat-playlist'
+    ], capture_output=True, text=True, timeout=30)
+    
+    if search.returncode == 0 and search.stdout.strip():
+        lines = search.stdout.strip().split('\n')
+        report['video'] = f'✅ Найдено видео: {lines[0]}'
+        report['video_found'] = True
+    else:
+        report['video'] = '❌ Видео не найдено'
+        report['video_found'] = False
+    
+    # 3. Проверяем Google Drive
+    try:
+        service = get_drive_service()
+        about = service.about().get(fields='storageQuota').execute()
+        quota = about.get('storageQuota', {})
+        limit = int(quota.get('limit', 0))
+        usage = int(quota.get('usage', 0))
+        free_gb = (limit - usage) / (1024**3)
+        
+        if free_gb > 1:
+            report['drive'] = f'✅ Google Drive: {free_gb:.1f} ГБ свободно'
+            report['drive_ok'] = True
+        else:
+            report['drive'] = f'⚠️ Google Drive: мало места ({free_gb:.2f} ГБ)'
+            report['drive_ok'] = False
+    except Exception as e:
+        report['drive'] = f'❌ Google Drive недоступен: {str(e)}'
+        report['drive_ok'] = False
+    
+    # Итоговый статус
+    all_ok = report.get('video_found') and report.get('drive_ok')
+    report['ready'] = all_ok
+    
+    return jsonify(report)
+    
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
