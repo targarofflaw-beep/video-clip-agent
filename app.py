@@ -8,18 +8,15 @@ from googleapiclient.http import MediaFileUpload
 
 app = Flask(__name__)
 
-def def get_drive_service():
+def get_drive_service():
     credentials_json = os.environ.get('GOOGLE_CREDENTIALS')
-    if not credentials_json:
-        raise Exception('GOOGLE_CREDENTIALS not set')
-    # Убираем возможные лишние символы
-    credentials_json = credentials_json.strip()
     credentials_info = json.loads(credentials_json)
     credentials = service_account.Credentials.from_service_account_info(
         credentials_info,
         scopes=['https://www.googleapis.com/auth/drive']
     )
     return build('drive', 'v3', credentials=credentials)
+
 @app.route('/')
 def home():
     return 'Video Clip Agent is running!'
